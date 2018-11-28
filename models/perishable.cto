@@ -1,0 +1,306 @@
+/**
+  * A business network for shipping perishable goods
+  * The cargo is temperature controlled and contracts
+  * can be negociated based on the temperature
+  * readings received for the cargo
+  */
+
+namespace org.foodSupplyChain.food
+
+/**
+ * The type of perishable product being shipped
+ */
+enum ProductType {//运输的产品可以增加肉类食品
+  o vegetables
+  o meat
+  
+}                                     
+                                      
+
+/**
+ * The status of a shipment
+ */
+enum ShipmentStatus {
+  o produced//货物已生产
+  o IN_TRANSIT//货物运输
+  o ARRIVED//货物收到
+  o sell  //货物出售
+}
+
+/**
+ * Directions of the compass
+ */
+enum CompassDirection {
+  o N
+  o S
+  o E
+  o W
+}
+
+/**
+ * An abstract transaction that is related to a Shipment
+ */
+abstract transaction ShipmentTransaction {
+    --> Shipment shipment
+}
+
+/**
+ * An temperature reading for a shipment. E.g. received from a
+ * device within a temperature controlled shipping container
+ */
+
+transaction APIReading extends ShipmentTransaction {  //增加了空气污染指数
+  o Double unit
+}
+
+transaction TemperatureReading extends ShipmentTransaction {
+  o Double centigrade
+}
+
+/**
+ * A GPS reading for a shipment. E.g. received from a device
+ * within a shipping container
+ */
+transaction GpsReading extends ShipmentTransaction {
+  o String readingTime
+  o String latitude
+  o CompassDirection latitudeDir
+  o String longitude
+  o CompassDirection longitudeDir
+}
+transaction WeightReading extends ShipmentTransaction {    //增加食品重量读数
+  o Double kg
+  o DateTime readingDateTime  
+}
+
+/**
+ * A notification that a shipment has been received by the
+ * importer and that funds should be transferred from the importer
+ * to the grower to pay for the shipment.
+ */                                        
+
+transaction ShipmentReceived extends ShipmentTransaction {     
+  o DateTime receivedDateTime       
+}
+            
+/**
+ * A Shipment has been packed and is ready for pickup
+ */
+transaction ShipmentProduced extends ShipmentTransaction {            
+  o DateTime producedDateTime
+}
+/**
+ * A Shipment has been picked up
+ */
+transaction ShipmentPickup extends ShipmentTransaction {
+}
+
+/**
+ * A Shipment has been loaded for transport
+ */
+transaction ShipmentLoaded extends ShipmentTransaction {
+}
+
+
+
+/**
+ * A shipment being tracked as an asset on the ledger
+ */
+asset Shipment identified by shipmentId {
+  o String shipmentId
+  o ProductType type
+  o ShipmentStatus status
+  o Long unitCount         //货物数量
+  --> ContractFandS contractFandS
+  --> ContractFandR contractFandR
+  --> ContractRandC contractRandC
+  o TemperatureReading[] temperatureReadings optional
+  o GpsReading[] gpsReadings optional
+  o ShipmentProduced shipmentProduced optional
+  o ShipmentPickup shipmentPickup optional
+  o ShipmentLoaded shipmentLoaded optional
+  o ShipmentReceived shipmentReceived optional
+  o APIReading[] aPIReadings optional
+  o WeightReading[] weightReadings optional
+}
+
+/**
+ * Defines a contract between a Grower and an Importer to ship using
+ * a Shipper, paying a set unit price. The unit price is multiplied by
+ * a penality factor proportional to the deviation from the min and max
+ * negociated temperatures for the shipment.
+ */
+asset ContractFandS identified by contractFSId {//工厂和货运公司的合约
+  o String contractFSId
+  --> Producer producer                  //工厂
+  --> Shipper shipper               //运输，指物流和快递业
+  o DateTime arrivalDateTime
+  o Double shippingFee
+  o Double minTemperature                  
+  o Double maxTemperature
+  o Double minPenaltyFactor
+  o Double maxPenaltyFactor1
+  
+}
+asset ContractFandR identified by contractFRId {//工厂和餐厅的合约
+  o String contractFRId
+  --> Producer producer                  //工厂
+  --> Restaurant restaurant           //餐厅
+  o Double unitPrice                 //成本价
+  o Double maxPenaltyFactor2
+  o Double maxAirPollution
+}
+
+asset ContractRandC identified by contractRCId {//餐厅和消费者的合约
+  o String contractRCId
+  --> Restaurant restaurant                   //餐厅
+  --> Consumer consumer               //消费者
+  o Double sellingPrice           //卖价
+  o Double minWeight
+}
+
+
+
+
+/**
+ * A concept for a simple street address
+ */
+concept Address {
+  o String city optional
+  o String country
+  o String street optional    //公司，餐厅名称
+     
+}
+
+/**
+ * An abstract participant type in this business network
+ */
+abstract participant Business identified by name {
+  o Address address
+  o String name 
+  o Double accountBalance
+}
+abstract participant People identified by email {
+  o Address address
+  o String name optional
+  o String email 
+  o Double accountBalance
+}
+
+
+/**
+ * A Grower is a type of participant in the network
+ */
+participant Producer extends Business {  
+ }                                            /*×增加一个参与者，消费者，整个流程是
+                                               1.工厂对食品进行加工 
+                                               2.物流公司对食品进行运输
+                                               3.餐厅购买该产品，比如：麦当劳
+                                               4.消费者购买该产品
+                                               ×/
+
+
+/**
+ * A Shipper is a type of participant in the network
+ */
+participant Shipper extends Business {
+}
+
+/**
+ * An Importer is a type of participant in the network
+ */
+participant Consumer extends People {
+}
+
+participant Restaurant extends Business {
+}
+/**
+ * An IoTDevice is any device that is part of the network
+ */
+abstract participant IoTDevice identified by deviceId {
+  o String deviceId
+}
+
+/**
+ * An IoT temperature sensor
+ */
+participant TemperatureSensor extends IoTDevice {            
+}
+
+/**
+ * An IoT GPS Sensor
+ */
+participant AirSensor extends IoTDevice {
+}
+participant GpsSensor extends IoTDevice {
+}
+participant WeightSensor extends IoTDevice {
+}
+
+/**
+ * JUST FOR INITIALIZING A DEMO
+ */
+transaction SetupDemo {
+}
+
+/**
+ * An event - when the temperature goes outside the agreed-upon boundaries
+ */
+ event AirReadingEvent {
+  o String message
+  o Double airPollution
+   --> Shipment shipment
+}
+
+
+event TemperatureThresholdEvent {
+  o String message
+  o Double temperature
+  --> Shipment shipment
+}
+
+/**
+ * Event - when the ship arrives at the port
+ */
+event ShipmentInPortEvent {
+  o String message
+  o DateTime time
+  --> Shipment shipment
+}
+
+/**
+ * Event - when the shipment has been packed and is ready for pickup
+ */
+event ShipmentProducedEvent {
+  o String message
+  --> Shipment shipment
+}
+
+/**
+ * Event - when the shipment has been picked up and is ready for loading
+ */
+event ShipmentPickupEvent {
+  o String message
+  --> Shipment shipment
+}
+
+/**
+ * Event - when the shipment has been loaded onto the cargo ship
+ */
+event ShipmentLoadedEvent {
+  o String message
+  --> Shipment shipment
+}
+
+/**
+ * Event - when the shipment is received
+ */
+event ShipmentReceivedEvent {
+  o String message
+  --> Shipment shipment
+}
+event LackOfFoodEvent {
+  o String message
+  o Double weight
+  --> Shipment shipment
+}
